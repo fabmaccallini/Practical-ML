@@ -1,0 +1,83 @@
+---
+title: "Practical Machine Learning - Course Project"
+author: "Fabrizio Maccallini"
+date: "Tuesday, November 18, 2014"
+output: 
+  html_document:
+    keep_md: true
+---
+### Summary
+The goal of the project is to predict the type of exercise (*"classe"* variable in the training set) people carrying the device, such as Jawbone Up, Nike FuelBand, Fitbit, performed. The project is divided in three parts:  
+1. Loading, cleaning and processing the data.  
+2. Partitioning, training and cross-validating the train set.    
+3. Predicting the test set.  
+
+### 1. Data processing
+```{r, echo = TRUE, cache = TRUE}
+# Load the data
+train <- read.csv("http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", na.strings = c("#DIV/0!", "NA", ""))
+test <- read.csv("http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", na.strings = c("#DIV/0!", "NA", ""))
+```
+
+After loading the two data sets we observed very large numbers of NAs concentrated in specific variables of the *train* data set.  
+```{r, echo = TRUE}
+# Clean the train set
+na <- apply(train, 2, function(x) sum(is.na(x)))
+summary(na)
+# Closer look between Q1 and Median (Q2)
+quantile(na, probs = seq(0.25, 0.5, 0.05))
+# Clean the NA variables
+train.clean <- train[, na == 0]
+# Clean the descriptive variables
+train.clean <- train.clean[, -c(1: 7)]
+# Clean the test set
+test.clean <- test[, names(train.clean[, -53])] # "classe" not present in test
+```
+
+We decided to remove from the train set all the `r dim(train)[2] - dim(train.clean)[2]` variables having `r round(quantile(na, 0.5) / dim(train)[1] * 100, 2)`% or more of the observations equal to NAs, and to retain only the `r dim(train.clean)[2]` ones without NAs.  
+The first seven variables were also removed as they do not carry any information relevant for our purpose.
+Then we went through the same cleaning process for the test set, to be used for our predictions.  
+
+### 2. Training the model  
+```{r, echo = TRUE}
+# partition train.clean
+library(caret)
+inTrain <- createDataPartition(y = train.clean$classe, p = 3/4)[[1]]
+training = train.clean[inTrain,]
+testing = train.clean[-inTrain,]
+```
+
+The cleaned train set was paritioned into a training subset (75%) and a validation subset (25%). The model used for classifing the  type of exercise (variable *"classes"*) is the *random forest* (rf), being one of the most accurate learning algorithms. The number of folds used for cross validation is 10, generally accepted as a good compromise between bias and variance. In order to reduce the calculation time we are going to enable parallel computing on 4 cores.  
+```{r, echo = TRUE, cache = TRUE}
+# use multi-core support
+library(doParallel)
+registerDoParallel(core = 4)
+# train the model with cross-validation
+model <- train(classe ~ ., data = training, method = "rf", trControl = trainControl(method = "cv", number = 10))
+# validate the model
+pred <-  predict(model, newdata = testing)
+result <- confusionMatrix(pred, testing$classe)
+print(result)
+```
+
+As we expected the classification model achieved a very high accuracy rate of `r round(result$overall[1] * 100, 2)`%, so our estimate of the out of sample error is `r round((1 - result$overall[1]) * 100, 2)`% with `r round((1 - result$overall[4: 3]) * 100, 2)`% confidence interval. 
+
+### 3. Model prediction
+```{r, echo = TRUE}
+# predict the test set
+test.pred <-  predict(model, newdata = test.clean)
+```
+
+Running the classification model on the test set, produced the following predictions: `r test.pred`.  
+```{r, echo = TRUE, eval = FALSE}
+# function provided by the instructor
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1: n){
+    filename = paste0("problem_id_", i, ".txt")
+    write.table(x[i], file = filename, quote = FALSE, row.names = FALSE, col.names = FALSE)
+  }
+}
+pml_write_files(test.pred)
+closeAllConnections()
+```
