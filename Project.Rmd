@@ -60,7 +60,7 @@ result <- confusionMatrix(pred, testing$classe)
 print(result)
 ```
 
-As we expected the classification model achieved a very high accuracy rate of `r round(result$overall[1] * 100, 2)`%, so our estimate of the out of sample error is `r round((1 - result$overall[1]) * 100, 2)`% with `r round((1 - result$overall[4: 3]) * 100, 2)`% confidence interval. 
+The model was expecting an accuracy rate of `r round(max(model$results$Accuracy) * 100, 2)`%, with an estimated out of sample error of `r round((1 - max(model$results$Accuracy)) * 100, 2)`%. Predicting the testing subset the model achieved an accuracy rate of `r round(result$overall[1] * 100, 2)`%, the out of sample error is `r round((1 - result$overall[1]) * 100, 2)`% with `r round((1 - result$overall[4: 3]) * 100, 2)`% confidence interval. The estimate of the out of sample error was fairly in line with the actual value from the prediction.
 
 ### 3. Model prediction
 ```{r, echo = TRUE}
